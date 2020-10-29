@@ -147,7 +147,8 @@ func runStats() {
 				cpuStats[next].Usage = ((cpuStats[next].GapUser +
 					cpuStats[next].GapSystem +
 					cpuStats[next].GapIowait +
-					cpuStats[next].GapSoftIRQ) /
+					cpuStats[next].GapSoftIRQ +
+					cpuStats[next].GapSteal) /
 					(cpuStats[next].GapUser +
 						cpuStats[next].GapNice +
 						cpuStats[next].GapSystem +
@@ -196,11 +197,11 @@ func getStats(w http.ResponseWriter, r *http.Request) {
 	fl := float64(len(usages))
 
 	buffer := ""
-	buffer += fmt.Sprintf("maxcpu.user_sys_iowa_softi_usage.max\t%f\t%d\n", usages[round(fl)], now)
-	buffer += fmt.Sprintf("maxcpu.user_sys_iowa_softi_usage.min\t%f\t%d\n", usages[0], now)
-	buffer += fmt.Sprintf("maxcpu.user_sys_iowa_softi_usage.avg\t%f\t%d\n", t/fl, now)
-	buffer += fmt.Sprintf("maxcpu.user_sys_iowa_softi_usage.90pt\t%f\t%d\n", usages[round(fl*0.90)], now)
-	buffer += fmt.Sprintf("maxcpu.user_sys_iowa_softi_usage.75pt\t%f\t%d\n", usages[round(fl*0.75)], now)
+	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.max\t%f\t%d\n", usages[round(fl)], now)
+	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.min\t%f\t%d\n", usages[0], now)
+	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.avg\t%f\t%d\n", t/fl, now)
+	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.90pt\t%f\t%d\n", usages[round(fl*0.90)], now)
+	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.75pt\t%f\t%d\n", usages[round(fl*0.75)], now)
 
 	w.Write([]byte(buffer))
 }
