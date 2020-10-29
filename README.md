@@ -17,7 +17,7 @@ Help Options:
   -h, --help       Show this help message
 ```
 
-At the first time of execution, mackerel-plugin-maxcpu spawns the calculating daemon. From second execution mackerel-plugin-maxcpu connects the daemon to know CPU usages.
+At the first time of execution, mackerel-plugin-maxcpu spawns the calculating daemon. From second execution mackerel-plugin-maxcpu connects the background daemon to know CPU usages.
 
 ## sample
 
