@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -18,9 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/jessevdk/go-flags"
+	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 	"github.com/prometheus/procfs"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Version by Makefile
@@ -64,8 +67,75 @@ var maxIdleTime int64 = 600
 var idleTime int64 = 0
 var statsLock sync.Mutex
 
-func handleHello(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("OK\n"))
+func round(f float64) int64 {
+	return int64(math.Round(f)) - 1
+}
+
+type MaxCPUServer struct {
+}
+
+func (*MaxCPUServer) Hello(context.Context, *empty.Empty) (*maxcpu.HelloResponse, error) {
+	return &maxcpu.HelloResponse{Message: "OK"}, nil
+}
+
+func (*MaxCPUServer) GetStats(context.Context, *empty.Empty) (*maxcpu.StatsResponse, error) {
+	statsLock.Lock()
+	defer statsLock.Unlock()
+	var usages sort.Float64Slice
+	var i int64
+	var total float64
+	for i = 1; i < maxStats; i++ {
+		if cpuStats[i] != nil {
+			usages = append(usages, cpuStats[i].Usage)
+			total += cpuStats[i].Usage
+		}
+	}
+
+	// update idle time
+	idleTime = 0
+	// clear stats
+	current := cpuStats[currentStat]
+	currentStat = 0
+	cpuStats = make([]*cpuUsage, maxStats, maxStats)
+	cpuStats[0] = current
+
+	if len(usages) < 2 {
+		return nil, status.Errorf(codes.Unavailable, "Calculating now")
+	}
+
+	sort.Sort(usages)
+	flen := float64(len(usages))
+	epoch := time.Now().Unix()
+
+	metrics := []*maxcpu.Metric{}
+
+	metrics = append(metrics, &maxcpu.Metric{
+		Key:    "max",
+		Metric: usages[round(flen)],
+		Epoch:  epoch,
+	})
+	metrics = append(metrics, &maxcpu.Metric{
+		Key:    "min",
+		Metric: usages[0],
+		Epoch:  epoch,
+	})
+	metrics = append(metrics, &maxcpu.Metric{
+		Key:    "avg",
+		Metric: total / flen,
+		Epoch:  epoch,
+	})
+	metrics = append(metrics, &maxcpu.Metric{
+		Key:    "90pt",
+		Metric: usages[round(flen*0.90)],
+		Epoch:  epoch,
+	})
+	metrics = append(metrics, &maxcpu.Metric{
+		Key:    "75pt",
+		Metric: usages[round(flen*0.75)],
+		Epoch:  epoch,
+	})
+
+	return &maxcpu.StatsResponse{Metrics: metrics}, nil
 }
 
 func execBackground(opts cmdOpts) int {
@@ -166,58 +236,23 @@ func runStats() {
 	}
 }
 
-func round(f float64) int64 {
-	return int64(math.Round(f)) - 1
-}
-
-func getStats(w http.ResponseWriter, r *http.Request) {
-	statsLock.Lock()
-	defer statsLock.Unlock()
-	idleTime = 0
-	var usages sort.Float64Slice
-	var i int64
-	var t float64
-	for i = 1; i < maxStats; i++ {
-		if cpuStats[i] != nil {
-			usages = append(usages, cpuStats[i].Usage)
-			t += cpuStats[i].Usage
-		}
-	}
-	currentStat = 0
-	cpuStats = make([]*cpuUsage, maxStats, maxStats)
-
-	if len(usages) == 0 {
-		w.WriteHeader(http.StatusTooEarly)
-		w.Write([]byte("Calculating now\n"))
-		return
-	}
-
-	now := time.Now().Unix()
-	sort.Sort(usages)
-	fl := float64(len(usages))
-
-	buffer := ""
-	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.max\t%f\t%d\n", usages[round(fl)], now)
-	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.min\t%f\t%d\n", usages[0], now)
-	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.avg\t%f\t%d\n", t/fl, now)
-	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.90pt\t%f\t%d\n", usages[round(fl*0.90)], now)
-	buffer += fmt.Sprintf("maxcpu.us_sy_wa_si_st_usage.75pt\t%f\t%d\n", usages[round(fl*0.75)], now)
-
-	w.Write([]byte(buffer))
-}
-
 func runBackground(opts cmdOpts) int {
 	statsLock.Lock()
+	// initilize stats
 	currentStat = 0
 	cpuStats = make([]*cpuUsage, maxStats, maxStats)
 	statsLock.Unlock()
+
 	cpu, err := cpuStat()
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
+
 	go func() { runStats() }()
+
 	defer os.Remove(opts.Socket)
+
 	firstCPU = cpuUsage{
 		User:      cpu.User,
 		Nice:      cpu.Nice,
@@ -230,24 +265,18 @@ func runBackground(opts cmdOpts) int {
 		Guest:     cpu.Guest,
 		GuestNice: cpu.GuestNice,
 	}
-	time.Sleep(1 * time.Second)
-	m := mux.NewRouter()
-	m.HandleFunc("/", handleHello)
-	m.HandleFunc("/hc", handleHello)
-	m.HandleFunc("/get", getStats)
 
-	server := http.Server{
-		Handler: m,
-	}
+	time.Sleep(1 * time.Second)
+
+	server := grpc.NewServer()
+	maxcpu.RegisterMaxCPUServer(server, &MaxCPUServer{})
 
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
 		<-sigChan
-		if es := server.Shutdown(context.Background()); es != nil {
-			log.Printf("Shutdown error: %s", es)
-		}
+		server.GracefulStop()
 		close(idleConnsClosed)
 	}()
 
@@ -264,45 +293,52 @@ func runBackground(opts cmdOpts) int {
 	return 0
 }
 
-func makeTransport(opts cmdOpts) http.Client {
-	client := http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.DialTimeout("unix", opts.Socket, 1*time.Second)
-			},
-			ResponseHeaderTimeout: 1 * time.Second,
-		},
+func makeTransport(opts cmdOpts) (maxcpu.MaxCPUClient, error) {
+	dialer := func(a string, t time.Duration) (net.Conn, error) {
+		return net.DialTimeout("unix", a, 1*time.Second)
 	}
-	return client
+	conn, err := grpc.Dial(opts.Socket, grpc.WithInsecure(), grpc.WithDialer(dialer))
+	if err != nil {
+		return nil, err
+	}
+	c := maxcpu.NewMaxCPUClient(conn)
+	return c, nil
 }
 
 func checkHTTPalive(opts cmdOpts) bool {
-	client := makeTransport(opts)
-	res, err := client.Get("http://unix/hc")
+	client, err := makeTransport(opts)
 	if err != nil {
 		log.Printf("%v", err)
 		return false
 	}
-	io.Copy(ioutil.Discard, res.Body)
-	res.Body.Close()
+	_, err = client.Hello(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		log.Printf("%v", err)
+		return false
+	}
 	return true
 }
 
 func getHTTPstats(opts cmdOpts) int {
-	client := makeTransport(opts)
-	res, err := client.Get("http://unix/get")
+	client, err := makeTransport(opts)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
-	defer res.Body.Close()
-	if res.StatusCode == http.StatusOK {
-		io.Copy(os.Stdout, res.Body)
-		return 0
-	}
-	buf, _ := ioutil.ReadAll(res.Body)
-	log.Printf("%s", string(buf))
 
+	res, err := client.GetStats(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		log.Printf("%v", err)
+		return 1
+	}
+	for _, m := range res.GetMetrics() {
+		fmt.Printf(
+			"maxcpu.us_sy_wa_si_st_usage.%s\t%f\t%d\n",
+			m.Key,
+			m.Metric,
+			m.Epoch,
+		)
+	}
 	return 1
 }
 
