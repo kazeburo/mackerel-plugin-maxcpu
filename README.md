@@ -19,16 +19,18 @@ Help Options:
 
 At the first time of execution, mackerel-plugin-maxcpu spawns the calculating daemon. From second execution mackerel-plugin-maxcpu connects the background daemon to know CPU usages.
 
+Current works on Linux Only.
+
 ## sample
 
 ```
-$  ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
-2020/10/29 15:29:47 Get "http://unix/hc": dial unix /tmp/maxcpu.sock: connect: no such file or directory
-2020/10/29 15:29:47 start background process
-$  ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
-maxcpu.user_sys_iowa_softi_usage.max    0.748130        1603952991
-maxcpu.user_sys_iowa_softi_usage.min    0.000000        1603952991
-maxcpu.user_sys_iowa_softi_usage.avg    0.333340        1603952991
-maxcpu.user_sys_iowa_softi_usage.90pt   0.748130        1603952991
-maxcpu.user_sys_iowa_softi_usage.75pt   0.251889        1603952991
+$ ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
+2020/10/30 10:40:54 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial unix /tmp/maxcpu.sock: connect: no such file or directory"
+2020/10/30 10:40:54 start background process
+$ ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
+maxcpu.us_sy_wa_si_st_usage.max 0.251256        1604022058
+maxcpu.us_sy_wa_si_st_usage.min 0.250627        1604022058
+maxcpu.us_sy_wa_si_st_usage.avg 0.250941        1604022058
+maxcpu.us_sy_wa_si_st_usage.90pt        0.251256        1604022058
+maxcpu.us_sy_wa_si_st_usage.75pt        0.251256        1604022058
 ```
