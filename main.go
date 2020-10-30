@@ -65,7 +65,7 @@ type cpuUsage struct {
 var cpuStats []*cpuUsage
 var currentStat int64
 var maxStats int64 = 361
-var maxIdleTime int64 = 601
+var maxIdleTime int64 = 600
 var idleTime int64 = 0
 var statsLock sync.Mutex
 
