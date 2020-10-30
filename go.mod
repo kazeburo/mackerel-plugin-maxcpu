@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/golang/protobuf v1.4.3
 	github.com/jessevdk/go-flags v1.4.0
+	github.com/libp2p/go-reuseport v0.0.2
 	github.com/prometheus/procfs v0.2.0
 	golang.org/x/net v0.0.0-20201029221708-28c70e62bb1d // indirect
 	golang.org/x/sys v0.0.0-20201029080932-201ba4db2418 // indirect

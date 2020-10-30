@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -12,12 +14,14 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
+	reuse "github.com/libp2p/go-reuseport"
 	"github.com/prometheus/procfs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -58,11 +62,10 @@ type cpuUsage struct {
 	Usage        float64
 }
 
-var firstCPU cpuUsage
 var cpuStats []*cpuUsage
 var currentStat int64
 var maxStats int64 = 361
-var maxIdleTime int64 = 600
+var maxIdleTime int64 = 601
 var idleTime int64 = 0
 var statsLock sync.Mutex
 
@@ -77,6 +80,10 @@ func (*MaxCPUServer) Hello(_ context.Context, _ *empty.Empty) (*maxcpu.HelloResp
 }
 
 func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsResponse, error) {
+
+	// update idle time
+	atomic.StoreInt64(&idleTime, 0)
+
 	statsLock.Lock()
 	defer statsLock.Unlock()
 	var usages sort.Float64Slice
@@ -89,8 +96,6 @@ func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsR
 		}
 	}
 
-	// update idle time
-	idleTime = 0
 	// clear stats
 	current := cpuStats[currentStat]
 	currentStat = 0
@@ -136,16 +141,6 @@ func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsR
 	return &maxcpu.StatsResponse{Metrics: metrics}, nil
 }
 
-func execBackground(opts cmdOpts) int {
-	cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
-	err := cmd.Start()
-	if err != nil {
-		log.Printf("%v", err)
-		return 1
-	}
-	return 0
-}
-
 func cpuStat() (procfs.CPUStat, error) {
 	// read /proc/stat
 	cpu, err := procfs.NewStat()
@@ -153,6 +148,42 @@ func cpuStat() (procfs.CPUStat, error) {
 		return procfs.CPUStat{}, err
 	}
 	return cpu.CPUTotal, nil
+}
+
+func runBinaryCheck(opts cmdOpts, current string) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case _ = <-ticker.C:
+			md5, err := selfCheckSum()
+			if err == nil {
+				if md5 != current {
+					cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
+					err = cmd.Start()
+					if err != nil {
+						log.Printf("%v", err)
+					} else {
+						syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+					}
+				}
+			}
+		}
+	}
+}
+
+func runIdleCheck() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case _ = <-ticker.C:
+			atomic.AddInt64(&idleTime, 1)
+			if atomic.LoadInt64(&idleTime) > maxIdleTime {
+				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+			}
+		}
+	}
 }
 
 func runStats() {
@@ -167,10 +198,6 @@ func runStats() {
 				continue
 			}
 			statsLock.Lock()
-			idleTime++
-			if idleTime > maxIdleTime {
-				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-			}
 			if cpuStats[0] == nil {
 				// first time
 				cpuStats[0] = &cpuUsage{
@@ -234,6 +261,31 @@ func runStats() {
 	}
 }
 
+func selfCheckSum() (string, error) {
+	b, err := ioutil.ReadFile(os.Args[0])
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", md5.Sum(b)), nil
+}
+
+func execBackground(opts cmdOpts) int {
+	// check proc before exec
+	_, err := cpuStat()
+	if err != nil {
+		log.Printf("%v", err)
+		return 1
+	}
+
+	cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
+	err = cmd.Start()
+	if err != nil {
+		log.Printf("%v", err)
+		return 1
+	}
+	return 0
+}
+
 func runBackground(opts cmdOpts) int {
 	statsLock.Lock()
 	// initilize stats
@@ -241,30 +293,19 @@ func runBackground(opts cmdOpts) int {
 	cpuStats = make([]*cpuUsage, maxStats, maxStats)
 	statsLock.Unlock()
 
-	cpu, err := cpuStat()
+	md5, err := selfCheckSum()
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
 
 	go func() { runStats() }()
-
-	defer os.Remove(opts.Socket)
-
-	firstCPU = cpuUsage{
-		User:      cpu.User,
-		Nice:      cpu.Nice,
-		System:    cpu.System,
-		Idle:      cpu.Idle,
-		Iowait:    cpu.Iowait,
-		IRQ:       cpu.IRQ,
-		SoftIRQ:   cpu.SoftIRQ,
-		Steal:     cpu.Steal,
-		Guest:     cpu.Guest,
-		GuestNice: cpu.GuestNice,
-	}
+	go func() { runIdleCheck() }()
+	go func() { runBinaryCheck(opts, md5) }()
 
 	time.Sleep(1 * time.Second)
+
+	defer os.Remove(opts.Socket)
 
 	server := grpc.NewServer()
 	maxcpu.RegisterMaxCPUServer(server, &MaxCPUServer{})
@@ -278,7 +319,7 @@ func runBackground(opts cmdOpts) int {
 		close(idleConnsClosed)
 	}()
 
-	unixListener, err := net.Listen("unix", opts.Socket)
+	unixListener, err := reuse.Listen("unix", opts.Socket)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
