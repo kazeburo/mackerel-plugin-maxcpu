@@ -309,7 +309,9 @@ func checkDaemonAlive(opts cmdOpts) bool {
 		log.Printf("%v", err)
 		return false
 	}
-	_, err = client.Hello(context.WithTimeout(context.Background(), 1*time.Second), &emptypb.Empty{})
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	_, err = client.Hello(ctx, &emptypb.Empty{})
 	if err != nil {
 		log.Printf("%v", err)
 		return false
@@ -323,8 +325,9 @@ func getStats(opts cmdOpts) int {
 		log.Printf("%v", err)
 		return 1
 	}
-
-	res, err := client.GetStats(context.WithTimeout(context.Background(), 5*time.Second), &emptypb.Empty{})
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	res, err := client.GetStats(ctx, &emptypb.Empty{})
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
