@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -71,14 +70,13 @@ func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
 
-type MaxCPUServer struct {
-}
+type MaxCPUServer struct{}
 
-func (*MaxCPUServer) Hello(context.Context, *empty.Empty) (*maxcpu.HelloResponse, error) {
+func (*MaxCPUServer) Hello(_ context.Context, _ *empty.Empty) (*maxcpu.HelloResponse, error) {
 	return &maxcpu.HelloResponse{Message: "OK"}, nil
 }
 
-func (*MaxCPUServer) GetStats(context.Context, *empty.Empty) (*maxcpu.StatsResponse, error) {
+func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsResponse, error) {
 	statsLock.Lock()
 	defer statsLock.Unlock()
 	var usages sort.Float64Slice
@@ -285,7 +283,7 @@ func runBackground(opts cmdOpts) int {
 		log.Printf("%v", err)
 		return 1
 	}
-	if err := server.Serve(unixListener); err != http.ErrServerClosed {
+	if err := server.Serve(unixListener); err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
@@ -305,7 +303,7 @@ func makeTransport(opts cmdOpts) (maxcpu.MaxCPUClient, error) {
 	return c, nil
 }
 
-func checkHTTPalive(opts cmdOpts) bool {
+func checkDaemonAlive(opts cmdOpts) bool {
 	client, err := makeTransport(opts)
 	if err != nil {
 		log.Printf("%v", err)
@@ -319,7 +317,7 @@ func checkHTTPalive(opts cmdOpts) bool {
 	return true
 }
 
-func getHTTPstats(opts cmdOpts) int {
+func getStats(opts cmdOpts) int {
 	client, err := makeTransport(opts)
 	if err != nil {
 		log.Printf("%v", err)
@@ -373,12 +371,12 @@ Compiler: %s %s
 		return runBackground(opts)
 	}
 
-	if !checkHTTPalive(opts) {
+	if !checkDaemonAlive(opts) {
 		// exec daemon
 		log.Printf("start background process")
 		return execBackground(opts)
 
 	}
 
-	return getHTTPstats(opts)
+	return getStats(opts)
 }
