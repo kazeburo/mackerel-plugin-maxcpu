@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
-	"crypto/md5"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -13,16 +13,17 @@ import (
 	"os/signal"
 	"runtime"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 	reuse "github.com/libp2p/go-reuseport"
-	"github.com/prometheus/procfs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,6 +37,19 @@ type cmdOpts struct {
 	Socket   string `short:"s" long:"socket" required:"true" description:"Socket file used calcurating daemon" `
 	AsDaemon bool   `long:"as-daemon" description:"run as daemon"`
 	Version  bool   `short:"v" long:"version" description:"Show version"`
+}
+
+type cpuStat struct {
+	User      float64
+	Nice      float64
+	System    float64
+	Idle      float64
+	Iowait    float64
+	IRQ       float64
+	SoftIRQ   float64
+	Steal     float64
+	Guest     float64
+	GuestNice float64
 }
 
 type cpuUsage struct {
@@ -141,24 +155,122 @@ func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsR
 	return &maxcpu.StatsResponse{Metrics: metrics}, nil
 }
 
-func cpuStat() (procfs.CPUStat, error) {
-	// read /proc/stat
-	cpu, err := procfs.NewStat()
+var cpuLineHeader = []byte("cpu ")
+
+// https://github.com/prometheus/procfs/blob/c0c2a8be4d30a2e2cb95ea371a6f32a506d3e45e/proc_stat.go#L40
+var userHZ float64 = 100
+
+func parseCPUstat(b []byte) (float64, error) {
+	f, err := strconv.ParseFloat(*(*string)(unsafe.Pointer(&b)), 64)
 	if err != nil {
-		return procfs.CPUStat{}, err
+		return f, err
 	}
-	return cpu.CPUTotal, nil
+	return f / userHZ, nil
 }
 
-func runBinaryCheck(opts cmdOpts, current string) {
+// cpu  168487 7399 36999 7766545 3915 0 13480 0 0 0
+// qw(cpu-user cpu-nice cpu-system cpu-idle cpu-iowait cpu-irq cpu-softirq cpu-steal cpu-guest cpu-guest-nice);
+func getCPUStat() (*cpuStat, error) {
+	// read /proc/stat
+	f, err := os.Open("/proc/stat")
+	if err != nil {
+		return nil, err
+	}
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		l := s.Bytes()
+		if bytes.HasPrefix(l, cpuLineHeader) {
+			fix := 0
+			if l[len(cpuLineHeader)+1] == ' ' {
+				fix = 1
+			}
+			cs := &cpuStat{}
+			sp := bytes.Split(l[len(cpuLineHeader)+fix+1:], []byte(" "))
+			if len(sp) > 0 {
+				f, err := parseCPUstat(sp[0])
+				if err != nil {
+					return nil, err
+				}
+				cs.User = f
+			}
+			if len(sp) > 1 {
+				f, err := parseCPUstat(sp[1])
+				if err != nil {
+					return nil, err
+				}
+				cs.Nice = f
+			}
+			if len(sp) > 2 {
+				f, err := parseCPUstat(sp[2])
+				if err != nil {
+					return nil, err
+				}
+				cs.System = f
+			}
+			if len(sp) > 3 {
+				f, err := parseCPUstat(sp[3])
+				if err != nil {
+					return nil, err
+				}
+				cs.Idle = f
+			}
+			if len(sp) > 4 {
+				f, err := parseCPUstat(sp[4])
+				if err != nil {
+					return nil, err
+				}
+				cs.Iowait = f
+			}
+			if len(sp) > 5 {
+				f, err := parseCPUstat(sp[5])
+				if err != nil {
+					return nil, err
+				}
+				cs.IRQ = f
+			}
+			if len(sp) > 6 {
+				f, err := parseCPUstat(sp[6])
+				if err != nil {
+					return nil, err
+				}
+				cs.SoftIRQ = f
+			}
+			if len(sp) > 7 {
+				f, err := parseCPUstat(sp[7])
+				if err != nil {
+					return nil, err
+				}
+				cs.Steal = f
+			}
+			if len(sp) > 8 {
+				f, err := parseCPUstat(sp[8])
+				if err != nil {
+					return nil, err
+				}
+				cs.Guest = f
+			}
+			if len(sp) > 9 {
+				f, err := parseCPUstat(sp[9])
+				if err != nil {
+					return nil, err
+				}
+				cs.GuestNice = f
+			}
+			return cs, nil
+		}
+	}
+	return nil, fmt.Errorf("No cpu stats found in /proc/stat")
+}
+
+func runBinaryCheck(opts cmdOpts, current time.Time) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case _ = <-ticker.C:
-			md5, err := selfCheckSum()
+			modified, err := selfModified()
 			if err == nil {
-				if md5 != current {
+				if modified != current {
 					cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
 					err = cmd.Start()
 					if err != nil {
@@ -192,7 +304,7 @@ func runStats() {
 	for {
 		select {
 		case _ = <-ticker.C:
-			cpu, err := cpuStat()
+			cpu, err := getCPUStat()
 			if err != nil {
 				log.Printf("%v", err)
 				continue
@@ -261,17 +373,18 @@ func runStats() {
 	}
 }
 
-func selfCheckSum() (string, error) {
-	b, err := ioutil.ReadFile(os.Args[0])
+func selfModified() (time.Time, error) {
+
+	fs, err := os.Stat(os.Args[0])
 	if err != nil {
-		return "", err
+		return time.Now(), err
 	}
-	return fmt.Sprintf("%x", md5.Sum(b)), nil
+	return fs.ModTime(), nil
 }
 
 func execBackground(opts cmdOpts) int {
 	// check proc before exec
-	_, err := cpuStat()
+	_, err := getCPUStat()
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
@@ -293,7 +406,7 @@ func runBackground(opts cmdOpts) int {
 	cpuStats = make([]*cpuUsage, maxStats, maxStats)
 	statsLock.Unlock()
 
-	md5, err := selfCheckSum()
+	modified, err := selfModified()
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
@@ -301,7 +414,7 @@ func runBackground(opts cmdOpts) int {
 
 	go func() { runStats() }()
 	go func() { runIdleCheck() }()
-	go func() { runBinaryCheck(opts, md5) }()
+	go func() { runBinaryCheck(opts, modified) }()
 
 	time.Sleep(1 * time.Second)
 
