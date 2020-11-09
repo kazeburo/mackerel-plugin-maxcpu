@@ -19,7 +19,7 @@ Help Options:
 
 At the first time of execution, mackerel-plugin-maxcpu spawns the calculating daemon. From second execution mackerel-plugin-maxcpu connects the background daemon to know CPU usages.
 
-Current works on Linux Only.
+Currently works on Linux Only.
 
 ## sample
 
