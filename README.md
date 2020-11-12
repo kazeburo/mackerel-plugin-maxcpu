@@ -34,3 +34,8 @@ maxcpu.us_sy_wa_si_st_usage.avg 0.250941        1604022058
 maxcpu.us_sy_wa_si_st_usage.90pt        0.251256        1604022058
 maxcpu.us_sy_wa_si_st_usage.75pt        0.251256        1604022058
 ```
+
+## THANKS
+
+The memcached protocol is based on katsubushi
+https://github.com/kayac/go-katsubushi
