@@ -83,15 +83,13 @@ func (cs *Server) Start(ctx context.Context, l net.Listener) error {
 		if err != nil {
 			select {
 			case <-ctx.Done():
-				log.Printf("Shutting down listener")
+				log.Printf("Shutting down")
 				return nil
 			default:
-				log.Printf("Error on accept connection: %s", err)
+				log.Printf("accept error: %s", err)
 				return err
 			}
 		}
-		// log.Printf("Connected from %s", conn.RemoteAddr().String())
-
 		go cs.handleConn(ctx, conn)
 	}
 }
@@ -121,14 +119,14 @@ func (cs *Server) handleConn(ctx context.Context, conn net.Conn) {
 		var err error
 		deadline, err = extendDeadline(conn)
 		if err != nil {
-			log.Printf("error on set deadline: %s", err)
+			log.Printf("set deadline error: %s", err)
 			return
 		}
 		cmdset, err := cs.parseCmd(scanner.Bytes())
 		if err != nil {
-			log.Printf("error on parse command error: %s", err)
+			log.Printf("parse command error: %s", err)
 			if err := cs.writeError(conn); err != nil {
-				log.Printf("error on write error: %s", err)
+				log.Printf("write error: %s", err)
 				return
 			}
 			continue
@@ -136,9 +134,9 @@ func (cs *Server) handleConn(ctx context.Context, conn net.Conn) {
 		res, err := cmdset.cb(cmdset.args)
 		if err != nil {
 			if err != io.EOF {
-				log.Printf("error on execute cmd %s: %s", cmdset.cmd, err)
+				log.Printf("execute cmd %s error: %s", cmdset.cmd, err)
 				if err := cs.writeError(conn); err != nil {
-					log.Printf("error on write error: %s", err)
+					log.Printf("write error: %s", err)
 					return
 				}
 				continue
@@ -150,7 +148,7 @@ func (cs *Server) handleConn(ctx context.Context, conn net.Conn) {
 			err := cs.writeRespose(w, val)
 			if err != nil {
 				if err != io.EOF {
-					log.Printf("error on Response %s: %s", cmdset.cmd, err)
+					log.Printf("write response %s error: %s", cmdset.cmd, err)
 				}
 				return
 			}
@@ -159,26 +157,26 @@ func (cs *Server) handleConn(ctx context.Context, conn net.Conn) {
 			res.Response = "END"
 		}
 		if res.Response == "" {
-			log.Printf("No message on %s: %s", cmdset.cmd, err)
+			log.Printf("no message on %s: %s", cmdset.cmd, err)
 			res.Response = "ERROR"
 		}
 		_, err = w.WriteString(res.Response)
 		if err != nil {
 			if err != io.EOF {
-				log.Printf("error on Response %s: %s", cmdset.cmd, err)
+				log.Printf("write response %s error: %s", cmdset.cmd, err)
 			}
 			return
 		}
 		_, err = w.Write([]byte("\r\n"))
 		if err != nil {
 			if err != io.EOF {
-				log.Printf("error on Response %s: %s", cmdset.cmd, err)
+				log.Printf("write final response %s error: %s", cmdset.cmd, err)
 			}
 			return
 		}
 		if err := w.Flush(); err != nil {
 			if err != io.EOF {
-				log.Printf("error on cmd %s write to conn: %s", cmdset.cmd, err)
+				log.Printf("flush response %s error: %s", cmdset.cmd, err)
 			}
 			return
 		}
@@ -191,7 +189,7 @@ func (cs *Server) handleConn(ctx context.Context, conn net.Conn) {
 		default:
 		}
 		if !time.Now().After(deadline) {
-			log.Printf("error on scanning request: %s", err)
+			log.Printf("scanner: %s", err)
 		}
 	}
 }

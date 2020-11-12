@@ -56,6 +56,10 @@ func (c *Client) Get(key string) ([]byte, error) {
 		return nil, err
 	}
 	extendDeadline(conn)
+	if err != nil {
+		c.close()
+		return nil, err
+	}
 
 	_, err = c.rw.WriteString("GET " + key + "\r\n")
 	if err != nil {
