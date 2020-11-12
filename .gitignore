@@ -26,4 +26,5 @@ _testmain.go
 mackerel-plugin-maxcpu
 vendor/
 dist/
+blog.md
 *~
