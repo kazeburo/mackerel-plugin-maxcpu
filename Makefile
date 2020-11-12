@@ -1,5 +1,5 @@
 VERSION=0.0.4
-LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION}"
+LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu.Version=${VERSION}"
 
 all: mackerel-plugin-maxcpu
 

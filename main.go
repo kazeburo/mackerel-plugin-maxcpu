@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -20,14 +21,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 	reuse "github.com/libp2p/go-reuseport"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Version by Makefile
@@ -76,6 +72,21 @@ type cpuUsage struct {
 	Usage        float64
 }
 
+type getHelloResponse struct {
+	Message string `json:"message"`
+}
+
+type getStatsResponse struct {
+	Error   string    `json:"error"`
+	Metrics []*Metric `json:"metrics"`
+}
+
+type Metric struct {
+	Key    string  `json:"key"`
+	Metric float64 `json:"metric"`
+	Epoch  int64   `json:"epoch"`
+}
+
 var cpuStats []*cpuUsage
 var currentStat int64
 var maxStats int64 = 361
@@ -87,14 +98,64 @@ func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
 
-type MaxCPUServer struct{}
-
-func (*MaxCPUServer) Hello(_ context.Context, _ *empty.Empty) (*maxcpu.HelloResponse, error) {
-	return &maxcpu.HelloResponse{Message: "OK"}, nil
+func CHello(c *maxcpu.Client) (*getHelloResponse, error) {
+	b, err := c.Get("hello")
+	if err != nil {
+		return nil, err
+	}
+	res := &getHelloResponse{}
+	err = json.Unmarshal(b, res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
-func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsResponse, error) {
+func CStats(c *maxcpu.Client) (*getStatsResponse, error) {
+	b, err := c.Get("stats")
+	if err != nil {
+		return nil, err
+	}
+	res := &getStatsResponse{}
+	err = json.Unmarshal(b, res)
+	if err != nil {
+		return nil, err
+	}
+	if res.Error != "" {
+		return nil, fmt.Errorf(res.Error)
+	}
+	if len(res.Metrics) == 0 {
+		return nil, fmt.Errorf("Could not fetch any metrics")
+	}
+	return res, nil
+}
 
+func MGet(keys []string) (*maxcpu.Response, error) {
+	if len(keys) == 0 || len(keys) > 1 {
+		return nil, fmt.Errorf("No arguments or too many arguments for GET")
+	}
+	switch keys[0] {
+	case "hello":
+		return MHello(keys[0])
+	case "stats":
+		return MStats(keys[0])
+	default:
+		return maxcpu.NotFound, nil
+	}
+}
+
+func MHello(key string) (*maxcpu.Response, error) {
+	res := getHelloResponse{"OK"}
+	b, _ := json.Marshal(res)
+	mres := &maxcpu.Response{}
+	mres.Values = append(mres.Values, &maxcpu.Value{
+		Key:  key,
+		Data: b,
+	})
+	return mres, nil
+}
+
+func MStats(key string) (*maxcpu.Response, error) {
 	// update idle time
 	atomic.StoreInt64(&idleTime, 0)
 
@@ -116,43 +177,57 @@ func (*MaxCPUServer) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsR
 	cpuStats = make([]*cpuUsage, maxStats, maxStats)
 	cpuStats[0] = current
 
+	var res getStatsResponse
+
 	if len(usages) < 2 {
-		return nil, status.Errorf(codes.Unavailable, "Calculating now")
+		res.Error = "Calculating now"
+		b, _ := json.Marshal(res)
+		mres := &maxcpu.Response{}
+		mres.Values = append(mres.Values, &maxcpu.Value{
+			Key:  key,
+			Data: b,
+		})
+		return mres, nil
 	}
 
 	sort.Sort(usages)
 	flen := float64(len(usages))
 	epoch := time.Now().Unix()
 
-	metrics := []*maxcpu.Metric{}
-
-	metrics = append(metrics, &maxcpu.Metric{
+	res.Metrics = append(res.Metrics, &Metric{
 		Key:    "max",
 		Metric: usages[round(flen)],
 		Epoch:  epoch,
 	})
-	metrics = append(metrics, &maxcpu.Metric{
+	res.Metrics = append(res.Metrics, &Metric{
 		Key:    "min",
 		Metric: usages[0],
 		Epoch:  epoch,
 	})
-	metrics = append(metrics, &maxcpu.Metric{
+	res.Metrics = append(res.Metrics, &Metric{
 		Key:    "avg",
 		Metric: total / flen,
 		Epoch:  epoch,
 	})
-	metrics = append(metrics, &maxcpu.Metric{
+	res.Metrics = append(res.Metrics, &Metric{
 		Key:    "90pt",
 		Metric: usages[round(flen*0.90)],
 		Epoch:  epoch,
 	})
-	metrics = append(metrics, &maxcpu.Metric{
+	res.Metrics = append(res.Metrics, &Metric{
 		Key:    "75pt",
 		Metric: usages[round(flen*0.75)],
 		Epoch:  epoch,
 	})
 
-	return &maxcpu.StatsResponse{Metrics: metrics}, nil
+	b, _ := json.Marshal(res)
+	mres := &maxcpu.Response{}
+	mres.Values = append(mres.Values, &maxcpu.Value{
+		Key:  key,
+		Data: b,
+	})
+
+	return mres, nil
 }
 
 var cpuLineHeader = []byte("cpu ")
@@ -420,15 +495,15 @@ func runBackground(opts cmdOpts) int {
 
 	defer os.Remove(opts.Socket)
 
-	server := grpc.NewServer()
-	maxcpu.RegisterMaxCPUServer(server, &MaxCPUServer{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
 		<-sigChan
-		server.GracefulStop()
+		cancel()
 		close(idleConnsClosed)
 	}()
 
@@ -437,7 +512,11 @@ func runBackground(opts cmdOpts) int {
 		log.Printf("%v", err)
 		return 1
 	}
-	if err := server.Serve(unixListener); err != nil {
+
+	mserver, _ := maxcpu.NewServer()
+	mserver.Register("GET", MGet)
+
+	if err := mserver.Start(ctx, unixListener); err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
@@ -445,27 +524,24 @@ func runBackground(opts cmdOpts) int {
 	return 0
 }
 
-func makeTransport(opts cmdOpts) (maxcpu.MaxCPUClient, error) {
-	dialer := func(a string, t time.Duration) (net.Conn, error) {
-		return net.DialTimeout("unix", a, 1*time.Second)
+func makeClient(opts cmdOpts) (*maxcpu.Client, error) {
+	dialer := func() (net.Conn, error) {
+		return net.DialTimeout("unix", opts.Socket, 1*time.Second)
 	}
-	conn, err := grpc.Dial(opts.Socket, grpc.WithInsecure(), grpc.WithDialer(dialer))
+	c, err := maxcpu.NewClient(dialer)
 	if err != nil {
 		return nil, err
 	}
-	c := maxcpu.NewMaxCPUClient(conn)
 	return c, nil
 }
 
 func checkDaemonAlive(opts cmdOpts) bool {
-	client, err := makeTransport(opts)
+	client, err := makeClient(opts)
 	if err != nil {
 		log.Printf("%v", err)
 		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	_, err = client.Hello(ctx, &emptypb.Empty{})
+	_, err = CHello(client)
 	if err != nil {
 		log.Printf("%v", err)
 		return false
@@ -474,19 +550,18 @@ func checkDaemonAlive(opts cmdOpts) bool {
 }
 
 func getStats(opts cmdOpts) int {
-	client, err := makeTransport(opts)
+	client, err := makeClient(opts)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	res, err := client.GetStats(ctx, &emptypb.Empty{})
+
+	res, err := CStats(client)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
-	for _, m := range res.GetMetrics() {
+	for _, m := range res.Metrics {
 		fmt.Printf(
 			"maxcpu.us_sy_wa_si_st_usage.%s\t%f\t%d\n",
 			m.Key,
