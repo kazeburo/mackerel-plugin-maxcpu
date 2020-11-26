@@ -1,5 +1,5 @@
 VERSION=0.0.6
-LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu.Version=${VERSION}"
+LDFLAGS=-ldflags "-w -s -X main.version=${VERSION} -X github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu.version=${VERSION}"
 
 all: mackerel-plugin-maxcpu
 
@@ -21,4 +21,3 @@ tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
 	git push origin master
-	goreleaser --rm-dist
