@@ -1,15 +1,15 @@
 builds:
   - binary: mackerel-plugin-maxcpu
     goos:
-      - darwin
       - linux
     goarch:
       - amd64
+      - arm64
     ldflags:
-     - w -s -X main.Version={{.Version}}
-archive:
-  format: zip
-  name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+      - -w -s -X main.version={{.Version}} -X github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu.version={{.Version}}
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 release:
   github:
     owner: kazeburo
