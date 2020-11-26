@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Version by Makefile
-var Version string
+// version by Makefile
+var version string
 
 var idleTimeout = 5 * time.Second
 
@@ -50,7 +50,7 @@ func quitCmd(keys []string) (*Response, error) {
 
 func versionCmd(keys []string) (*Response, error) {
 	return &Response{
-		Response: "VERSION " + Version,
+		Response: "VERSION " + version,
 	}, nil
 }
 
