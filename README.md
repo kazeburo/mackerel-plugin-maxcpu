@@ -2,7 +2,9 @@
 
 Mackerel plugin for Calculating Max/Min/Average CPU Usage in Period 
 
-## usage
+Blog Entry(in japanese): https://kazeburo.hatenablog.com/entry/2020/11/09/134207
+
+## Usage
 
 ```
 Usage:
@@ -21,7 +23,7 @@ At the first time of execution, mackerel-plugin-maxcpu spawns the calculating da
 
 Currently works on Linux Only.
 
-## sample
+Sample
 
 ```
 $ ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
@@ -34,6 +36,10 @@ maxcpu.us_sy_wa_si_st_usage.avg 0.250941        1604022058
 maxcpu.us_sy_wa_si_st_usage.90pt        0.251256        1604022058
 maxcpu.us_sy_wa_si_st_usage.75pt        0.251256        1604022058
 ```
+
+## Install
+
+Please download release page or `mkr plugin install kazeburo/mackerel-plugin-maxcpu`.
 
 ## THANKS
 
