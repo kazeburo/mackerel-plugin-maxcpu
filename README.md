@@ -4,6 +4,8 @@ Mackerel plugin for Calculating Max/Min/Average CPU Usage in Period
 
 Blog Entry(in japanese): https://kazeburo.hatenablog.com/entry/2020/11/09/134207
 
+mackerel-plugin-maxcpu works on Linux Only.
+
 ## Usage
 
 ```
@@ -20,8 +22,6 @@ Help Options:
 ```
 
 At the first time of execution, mackerel-plugin-maxcpu spawns the calculating daemon. From second execution mackerel-plugin-maxcpu connects the background daemon to know CPU usages.
-
-Currently works on Linux Only.
 
 Sample
 
