@@ -251,6 +251,7 @@ func getCPUStat() (*cpuStat, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		l := s.Bytes()
@@ -351,7 +352,8 @@ func runBinaryCheck(opts cmdOpts, current time.Time) {
 					if err != nil {
 						log.Printf("%v", err)
 					} else {
-						syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+						time.Sleep(10 * time.Second)
+						syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 					}
 				}
 			}
@@ -367,7 +369,7 @@ func runIdleCheck() {
 		case _ = <-ticker.C:
 			atomic.AddInt64(&idleTime, 1)
 			if atomic.LoadInt64(&idleTime) > maxIdleTime {
-				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+				syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 			}
 		}
 	}
@@ -493,8 +495,6 @@ func runBackground(opts cmdOpts) int {
 
 	time.Sleep(1 * time.Second)
 
-	defer os.Remove(opts.Socket)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -506,6 +506,8 @@ func runBackground(opts cmdOpts) int {
 		cancel()
 		close(idleConnsClosed)
 	}()
+
+	os.Remove(opts.Socket)
 
 	unixListener, err := reuse.Listen("unix", opts.Socket)
 	if err != nil {
@@ -526,7 +528,7 @@ func runBackground(opts cmdOpts) int {
 
 func makeClient(opts cmdOpts) (*maxcpu.Client, error) {
 	dialer := func() (net.Conn, error) {
-		return net.DialTimeout("unix", opts.Socket, 1*time.Second)
+		return net.DialTimeout("unix", opts.Socket, 5*time.Second)
 	}
 	c, err := maxcpu.NewClient(dialer)
 	if err != nil {
@@ -603,7 +605,6 @@ Compiler: %s %s
 		// exec daemon
 		log.Printf("start background process")
 		return execBackground(opts)
-
 	}
 
 	return getStats(opts)
