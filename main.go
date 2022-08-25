@@ -125,14 +125,14 @@ func CStats(c *maxcpu.Client) (*getStatsResponse, error) {
 		return nil, fmt.Errorf(res.Error)
 	}
 	if len(res.Metrics) == 0 {
-		return nil, fmt.Errorf("Could not fetch any metrics")
+		return nil, fmt.Errorf("could not fetch any metrics")
 	}
 	return res, nil
 }
 
 func MGet(keys []string) (*maxcpu.Response, error) {
 	if len(keys) == 0 || len(keys) > 1 {
-		return nil, fmt.Errorf("No arguments or too many arguments for GET")
+		return nil, fmt.Errorf("no arguments or too many arguments for get")
 	}
 	switch keys[0] {
 	case "hello":
@@ -174,7 +174,7 @@ func MStats(key string) (*maxcpu.Response, error) {
 	// clear stats
 	current := cpuStats[currentStat]
 	currentStat = 0
-	cpuStats = make([]*cpuUsage, maxStats, maxStats)
+	cpuStats = make([]*cpuUsage, maxStats)
 	cpuStats[0] = current
 
 	var res getStatsResponse
@@ -335,7 +335,7 @@ func getCPUStat() (*cpuStat, error) {
 			return cs, nil
 		}
 	}
-	return nil, fmt.Errorf("No cpu stats found in /proc/stat")
+	return nil, fmt.Errorf("no cpu stats found in /proc/stat")
 }
 
 func runBinaryCheck(opts cmdOpts, current time.Time) {
@@ -343,7 +343,7 @@ func runBinaryCheck(opts cmdOpts, current time.Time) {
 	defer ticker.Stop()
 	for {
 		select {
-		case _ = <-ticker.C:
+		case <-ticker.C:
 			modified, err := selfModified()
 			if err == nil {
 				if modified != current {
@@ -353,6 +353,7 @@ func runBinaryCheck(opts cmdOpts, current time.Time) {
 						log.Printf("%v", err)
 					} else {
 						time.Sleep(10 * time.Second)
+						// sockファイルを消さないようsigkillで止める
 						syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 					}
 				}
@@ -366,9 +367,10 @@ func runIdleCheck() {
 	defer ticker.Stop()
 	for {
 		select {
-		case _ = <-ticker.C:
+		case <-ticker.C:
 			atomic.AddInt64(&idleTime, 1)
 			if atomic.LoadInt64(&idleTime) > maxIdleTime {
+				// sockファイルを消さないようsigkillで止める
 				syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 			}
 		}
@@ -380,7 +382,7 @@ func runStats() {
 	defer ticker.Stop()
 	for {
 		select {
-		case _ = <-ticker.C:
+		case <-ticker.C:
 			cpu, err := getCPUStat()
 			if err != nil {
 				log.Printf("%v", err)
@@ -480,7 +482,7 @@ func runBackground(opts cmdOpts) int {
 	statsLock.Lock()
 	// initilize stats
 	currentStat = 0
-	cpuStats = make([]*cpuUsage, maxStats, maxStats)
+	cpuStats = make([]*cpuUsage, maxStats)
 	statsLock.Unlock()
 
 	modified, err := selfModified()
