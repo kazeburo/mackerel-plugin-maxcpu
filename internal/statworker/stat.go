@@ -29,7 +29,7 @@ var cpuLineHeader = []byte("cpu ")
 var userHZ float64 = 100
 
 func parseCPUstat(b []byte) (float64, error) {
-	f, err := strconv.ParseFloat(*(*string)(unsafe.Pointer(&b)), 64)
+	f, err := strconv.ParseFloat(string(b), 64)
 	if err != nil {
 		return f, err
 	}
