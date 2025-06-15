@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"unsafe"
 )
 
 type cpuStat struct {

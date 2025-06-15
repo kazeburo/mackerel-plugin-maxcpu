@@ -57,7 +57,7 @@ func (w *Worker) mStats(key string) (*maxcpu.Response, error) {
 	var usages sort.Float64Slice
 	var i int64
 	var total float64
-	for i = 1; i < maxUsage; i++ {
+	for i = 1; i < historySize; i++ {
 		if w.usages[i] != nil {
 			usages = append(usages, w.usages[i].Usage)
 			total += w.usages[i].Usage
@@ -67,7 +67,7 @@ func (w *Worker) mStats(key string) (*maxcpu.Response, error) {
 	// clear stats
 	current := w.usages[w.current]
 	w.current = 0
-	w.usages = make([]*cpuUsage, maxUsage)
+	w.usages = make([]*cpuUsage, historySize)
 	w.usages[0] = current
 
 	var res maxcpu.GetStatsResponse

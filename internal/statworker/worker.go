@@ -81,7 +81,7 @@ func (w *Worker) Run() {
 			}
 		} else {
 			next := w.current + 1
-			if next >= maxUsage {
+			if next >= historySize {
 				next = 1
 			}
 			w.usages[next] = &cpuUsage{
