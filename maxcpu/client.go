@@ -44,7 +44,6 @@ func (c *Client) close() {
 		return
 	}
 	c.conn.Close()
-	return
 }
 
 func (c *Client) Get(key string) ([]byte, error) {
