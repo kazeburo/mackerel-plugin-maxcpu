@@ -54,6 +54,9 @@ func getCPUStat(f *os.File) (*cpuStat, error) {
 	for s.Scan() {
 		l := s.Bytes()
 		if bytes.HasPrefix(l, cpuLineHeader) {
+			if len(l) <= len(cpuLineHeader)+1 {
+				continue // Skip this line if it's too short
+			}
 			fix := 0
 			if l[len(cpuLineHeader)+1] == ' ' {
 				fix = 1
