@@ -134,5 +134,8 @@ func getCPUStat(f *os.File) (*cpuStat, error) {
 			return cs, nil
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error: %w", err)
+	}
 	return nil, fmt.Errorf("no cpu stats found in /proc/stat")
 }
