@@ -11,6 +11,8 @@ import (
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 )
 
+// The `round` function rounds the input float to the nearest integer and subtracts 1.
+// This offset is applied to adjust for zero-based indexing in certain calculations.
 func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
