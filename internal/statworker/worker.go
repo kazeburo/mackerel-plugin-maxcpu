@@ -38,10 +38,13 @@ type cpuUsage struct {
 	Usage        float64
 }
 
-var maxUsage int64 = 361
+// historySize defines the maximum number of CPU usage records to retain.
+// The value 361 was chosen to represent a specific time period (e.g., 6 minutes and 1 second)
+// or based on hardware constraints. Adjust as needed for your application.
+const historySize = 361
 
 func New() *Worker {
-	usages := make([]*cpuUsage, maxUsage)
+	usages := make([]*cpuUsage, historySize)
 	return &Worker{
 		usages:   usages,
 		current:  0,
