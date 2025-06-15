@@ -33,7 +33,10 @@ func (w *Worker) mHello(key string) (*maxcpu.Response, error) {
 	res := maxcpu.GetHelloResponse{
 		Message: "OK",
 	}
-	b, _ := json.Marshal(res)
+	b, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
+	}
 	mres := &maxcpu.Response{}
 	mres.Values = append(mres.Values, &maxcpu.Value{
 		Key:  key,
