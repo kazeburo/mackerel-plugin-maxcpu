@@ -54,7 +54,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 		c.close()
 		return nil, err
 	}
-	extendDeadline(conn)
+	_, err = extendDeadline(conn)
 	if err != nil {
 		c.close()
 		return nil, err

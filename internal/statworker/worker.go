@@ -52,6 +52,69 @@ func New() *Worker {
 	}
 }
 
+func (w *Worker) calculatingGap(cpu *cpuStat) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.usages[0] == nil {
+		// first time
+		w.usages[0] = &cpuUsage{
+			User:      cpu.User,
+			Nice:      cpu.Nice,
+			System:    cpu.System,
+			Idle:      cpu.Idle,
+			Iowait:    cpu.Iowait,
+			IRQ:       cpu.IRQ,
+			SoftIRQ:   cpu.SoftIRQ,
+			Steal:     cpu.Steal,
+			Guest:     cpu.Guest,
+			GuestNice: cpu.GuestNice,
+		}
+		return
+	}
+	next := w.current + 1
+	if next >= historySize {
+		next = 1
+	}
+	w.usages[next] = &cpuUsage{
+		User:         cpu.User,
+		Nice:         cpu.Nice,
+		System:       cpu.System,
+		Idle:         cpu.Idle,
+		Iowait:       cpu.Iowait,
+		IRQ:          cpu.IRQ,
+		SoftIRQ:      cpu.SoftIRQ,
+		Steal:        cpu.Steal,
+		Guest:        cpu.Guest,
+		GuestNice:    cpu.GuestNice,
+		GapUser:      cpu.User - w.usages[w.current].User,
+		GapNice:      cpu.Nice - w.usages[w.current].Nice,
+		GapSystem:    cpu.System - w.usages[w.current].System,
+		GapIdle:      cpu.Idle - w.usages[w.current].Idle,
+		GapIowait:    cpu.Iowait - w.usages[w.current].Iowait,
+		GapIRQ:       cpu.IRQ - w.usages[w.current].IRQ,
+		GapSoftIRQ:   cpu.SoftIRQ - w.usages[w.current].SoftIRQ,
+		GapSteal:     cpu.Steal - w.usages[w.current].Steal,
+		GapGuest:     cpu.Guest - w.usages[w.current].Guest,
+		GapGuestNice: cpu.GuestNice - w.usages[w.current].GuestNice,
+	}
+	w.usages[next].Usage = ((w.usages[next].GapUser +
+		w.usages[next].GapSystem +
+		w.usages[next].GapIowait +
+		w.usages[next].GapSoftIRQ +
+		w.usages[next].GapSteal) /
+		(w.usages[next].GapUser +
+			w.usages[next].GapNice +
+			w.usages[next].GapSystem +
+			w.usages[next].GapIdle +
+			w.usages[next].GapIowait +
+			w.usages[next].GapIRQ +
+			w.usages[next].GapSoftIRQ +
+			w.usages[next].GapSteal +
+			w.usages[next].GapGuest +
+			w.usages[next].GapGuestNice)) * 100.0
+	w.current = next
+}
+
 func (w *Worker) Run() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -64,65 +127,6 @@ func (w *Worker) Run() {
 			log.Printf("%v", err)
 			continue
 		}
-		w.lock.Lock()
-		if w.usages[0] == nil {
-			// first time
-			w.usages[0] = &cpuUsage{
-				User:      cpu.User,
-				Nice:      cpu.Nice,
-				System:    cpu.System,
-				Idle:      cpu.Idle,
-				Iowait:    cpu.Iowait,
-				IRQ:       cpu.IRQ,
-				SoftIRQ:   cpu.SoftIRQ,
-				Steal:     cpu.Steal,
-				Guest:     cpu.Guest,
-				GuestNice: cpu.GuestNice,
-			}
-		} else {
-			next := w.current + 1
-			if next >= historySize {
-				next = 1
-			}
-			w.usages[next] = &cpuUsage{
-				User:         cpu.User,
-				Nice:         cpu.Nice,
-				System:       cpu.System,
-				Idle:         cpu.Idle,
-				Iowait:       cpu.Iowait,
-				IRQ:          cpu.IRQ,
-				SoftIRQ:      cpu.SoftIRQ,
-				Steal:        cpu.Steal,
-				Guest:        cpu.Guest,
-				GuestNice:    cpu.GuestNice,
-				GapUser:      cpu.User - w.usages[w.current].User,
-				GapNice:      cpu.Nice - w.usages[w.current].Nice,
-				GapSystem:    cpu.System - w.usages[w.current].System,
-				GapIdle:      cpu.Idle - w.usages[w.current].Idle,
-				GapIowait:    cpu.Iowait - w.usages[w.current].Iowait,
-				GapIRQ:       cpu.IRQ - w.usages[w.current].IRQ,
-				GapSoftIRQ:   cpu.SoftIRQ - w.usages[w.current].SoftIRQ,
-				GapSteal:     cpu.Steal - w.usages[w.current].Steal,
-				GapGuest:     cpu.Guest - w.usages[w.current].Guest,
-				GapGuestNice: cpu.GuestNice - w.usages[w.current].GuestNice,
-			}
-			w.usages[next].Usage = ((w.usages[next].GapUser +
-				w.usages[next].GapSystem +
-				w.usages[next].GapIowait +
-				w.usages[next].GapSoftIRQ +
-				w.usages[next].GapSteal) /
-				(w.usages[next].GapUser +
-					w.usages[next].GapNice +
-					w.usages[next].GapSystem +
-					w.usages[next].GapIdle +
-					w.usages[next].GapIowait +
-					w.usages[next].GapIRQ +
-					w.usages[next].GapSoftIRQ +
-					w.usages[next].GapSteal +
-					w.usages[next].GapGuest +
-					w.usages[next].GapGuestNice)) * 100.0
-			w.current = next
-		}
-		w.lock.Unlock()
+		w.calculatingGap(cpu)
 	}
 }

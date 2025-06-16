@@ -62,7 +62,7 @@ func getCPUStat(f *os.File) (*cpuStat, error) {
 				fix = 1
 			}
 			cs := &cpuStat{}
-			sp := bytes.Split(l[len(cpuLineHeader)+fix+1:], []byte(" "))
+			sp := bytes.Fields(l[len(cpuLineHeader)+fix+1:])
 			if len(sp) > 0 {
 				f, err := parseCPUstat(sp[0])
 				if err != nil {
