@@ -1,10 +1,12 @@
 module github.com/kazeburo/mackerel-plugin-maxcpu
 
-go 1.18
+go 1.23.0
+
+toolchain go1.23.4
 
 require (
-	github.com/jessevdk/go-flags v1.5.0
-	github.com/libp2p/go-reuseport v0.2.0
+	github.com/jessevdk/go-flags v1.6.1
+	github.com/libp2p/go-reuseport v0.4.0
 )
 
-require golang.org/x/sys v0.0.0-20220823224334-20c2bfdbfe24 // indirect
+require golang.org/x/sys v0.33.0 // indirect

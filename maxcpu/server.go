@@ -225,7 +225,7 @@ func (cs *Server) writeRespose(w *bufio.Writer, val *Value) error {
 
 func (cs *Server) parseCmd(b []byte) (*CallbackSet, error) {
 	if len(b) == 0 {
-		return nil, fmt.Errorf("No command")
+		return nil, fmt.Errorf("no command")
 	}
 
 	args := strings.Fields(string(b))
@@ -243,5 +243,5 @@ func (cs *Server) parseCmd(b []byte) (*CallbackSet, error) {
 			values: values,
 		}, nil
 	}
-	return nil, fmt.Errorf("Unknown command: %s", name)
+	return nil, fmt.Errorf("unknown command: %s", name)
 }
