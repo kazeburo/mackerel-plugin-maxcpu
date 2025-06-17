@@ -20,7 +20,7 @@ linux-check: linux
 	sleep 5; \
 	./mackerel-plugin-maxcpu -s $$tmpfile; \
 	sleep 5; \
-	lines=$$(./mackerel-plugin-maxcpu -s $$tmpfile | |grep maxcpu | wc -l); \
+	lines=$$(./mackerel-plugin-maxcpu -s $$tmpfile | grep maxcpu | wc -l); \
 	if [ "$$lines" -ne 5 ]; then \
 		echo "Expected 5 lines, got $$lines"; \
 		exit 1; \
