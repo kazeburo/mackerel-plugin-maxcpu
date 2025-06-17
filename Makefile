@@ -11,6 +11,22 @@ mackerel-plugin-maxcpu: main.go maxcpu/*.go
 linux: main.go maxcpu/*.go
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o mackerel-plugin-maxcpu main.go
 
+linux-check: linux
+	@bash -c ' \
+	set -e; \
+	tmpfile=$$(mktemp /tmp/tmpfile.XXXXXX); \
+	trap "rm -f $$tmpfile" EXIT; \
+	./mackerel-plugin-maxcpu -s $$tmpfile; \
+	sleep 5; \
+	./mackerel-plugin-maxcpu -s $$tmpfile; \
+	sleep 5; \
+	lines=$$(./mackerel-plugin-maxcpu -s $$tmpfile | |grep maxcpu | wc -l); \
+	if [ "$$lines" -ne 5 ]; then \
+		echo "Expected 5 lines, got $$lines"; \
+		exit 1; \
+	fi; \
+	pkill -f $$tmpfile'
+
 check:
 	go test ./...
 
