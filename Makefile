@@ -14,7 +14,7 @@ linux: main.go maxcpu/*.go
 linux-check: linux
 	@bash -c ' \
 	set -e; \
-	tmpfile=$$(mktemp /tmp/tmpfile.XXXXXX); \
+	tmpfile=$$(mktemp tmpfile.XXXXXX); \
 	trap "rm -f $$tmpfile" EXIT; \
 	./mackerel-plugin-maxcpu -s $$tmpfile; \
 	sleep 5; \
