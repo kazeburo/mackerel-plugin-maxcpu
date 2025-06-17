@@ -16,8 +16,9 @@ linux-check: mackerel-plugin-maxcpu
 	set -e; \
 	tmpfile=$$(mktemp tmpfile.XXXXXX); \
 	trap "rm -f $$tmpfile" EXIT; \
+	rm -f $$tmpfile; \
 	./mackerel-plugin-maxcpu -s $$tmpfile; \
-	ps faxu; \
+	ls -l; \
 	sleep 5; \
 	./mackerel-plugin-maxcpu -s $$tmpfile | grep maxcpu; \
 	sleep 5; \
