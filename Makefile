@@ -18,7 +18,6 @@ linux-check: mackerel-plugin-maxcpu
 	trap "rm -f $$tmpfile" EXIT; \
 	rm -f $$tmpfile; \
 	./mackerel-plugin-maxcpu -s $$tmpfile; \
-	ls -l; \
 	sleep 5; \
 	./mackerel-plugin-maxcpu -s $$tmpfile | grep maxcpu; \
 	sleep 5; \
