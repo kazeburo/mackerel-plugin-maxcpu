@@ -99,11 +99,14 @@ func execBackground(opts cmdOpts) int {
 	}
 
 	cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 	err = cmd.Start()
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
+	time.After(5 * time.Second)
 	return 0
 }
 
