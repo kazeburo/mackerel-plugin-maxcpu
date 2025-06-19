@@ -15,7 +15,9 @@ jobs:
           go-version-file: go.mod
 
       - name: test
-        run: make check
+        run: |
+          make check
+          make linux-check
 
       - name: Snapshot GoReleaser
         uses: goreleaser/goreleaser-action@v5
