@@ -16,7 +16,6 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
-	reuse "github.com/libp2p/go-reuseport"
 )
 
 // version by Makefile
@@ -151,7 +150,7 @@ func runBackground(opts cmdOpts) int {
 
 	os.Remove(opts.Socket)
 
-	unixListener, err := reuse.Listen("unix", opts.Socket)
+	unixListener, err := net.Listen("unix", opts.Socket)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
