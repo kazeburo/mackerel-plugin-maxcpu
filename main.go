@@ -154,6 +154,13 @@ func runBackground(opts cmdOpts) int {
 		return 1
 	}
 
+	cmd := exec.Command("ls", "-la")
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s\n", stdoutStderr)
+
 	mserver, _ := maxcpu.NewServer()
 	mserver.Register("GET", worker.MGet)
 
