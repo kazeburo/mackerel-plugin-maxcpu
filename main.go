@@ -137,7 +137,7 @@ func checkDaemonAlive(opt *Opt) bool {
 	defer cancel()
 	_, err := opt.client.Hello(ctx, &emptypb.Empty{})
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("check daemon alive failed: %v", err)
 		return false
 	}
 	return true
