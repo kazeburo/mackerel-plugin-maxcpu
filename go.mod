@@ -3,7 +3,6 @@ module github.com/kazeburo/mackerel-plugin-maxcpu
 go 1.24.0
 
 require (
-	github.com/golang/protobuf v1.5.4
 	github.com/jessevdk/go-flags v1.6.1
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.10

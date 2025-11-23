@@ -170,6 +170,7 @@ func makeClient(socket string) (maxcpu.MaxCPUClient, error) {
 		"unix:"+socket,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
+		grpc.WithDisableHealthCheck(),
 	)
 	if err != nil {
 		return nil, err

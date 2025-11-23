@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // The `round` function rounds the input float to the nearest integer and subtracts 1.
@@ -18,11 +18,11 @@ func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
 
-func (w *Worker) Hello(_ context.Context, _ *empty.Empty) (*maxcpu.HelloResponse, error) {
+func (w *Worker) Hello(_ context.Context, _ *emptypb.Empty) (*maxcpu.HelloResponse, error) {
 	return &maxcpu.HelloResponse{Message: "OK"}, nil
 }
 
-func (w *Worker) GetStats(_ context.Context, _ *empty.Empty) (*maxcpu.StatsResponse, error) {
+func (w *Worker) GetStats(_ context.Context, _ *emptypb.Empty) (*maxcpu.StatsResponse, error) {
 	stats, err := w.stats()
 	if err != nil {
 		return nil, err
