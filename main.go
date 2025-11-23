@@ -167,7 +167,7 @@ func makeClient(socket string) (maxcpu.MaxCPUClient, error) {
 		return net.DialTimeout("unix", socket, 1*time.Second)
 	}
 	conn, err := grpc.NewClient(
-		socket,
+		"unix:"+socket,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 	)
