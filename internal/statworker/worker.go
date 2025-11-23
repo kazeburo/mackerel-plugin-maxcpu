@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 )
 
 type Worker struct {
@@ -12,6 +14,7 @@ type Worker struct {
 	current  int64
 	lock     sync.Mutex
 	idleTime int64
+	maxcpu.UnimplementedMaxCPUServer
 }
 
 type cpuUsage struct {

@@ -1,13 +1,10 @@
 package statworker
 
 import (
-	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 )
 
 func newTestWorkerWithUsages(usages []float64, current int64) *Worker {
@@ -27,44 +24,30 @@ func newTestWorkerWithUsages(usages []float64, current int64) *Worker {
 
 func TestMStats_NotEnoughData(t *testing.T) {
 	w := newTestWorkerWithUsages([]float64{10.0}, 0)
-	resp, err := w.mStats("stats")
+	resp, err := w.stats()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		// "calculating now" エラーが返ることを期待
+		if err.Error() != "calculating now" {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	}
-	if len(resp.Values) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(resp.Values))
-	}
-	var stats maxcpu.GetStatsResponse
-	if err := json.Unmarshal(resp.Values[0].Data, &stats); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
-	if stats.Error != "Calculating now" {
-		t.Errorf("expected error message, got: %v", stats.Error)
+	if len(resp) != 0 {
+		t.Fatalf("expected 0 value, got %d", len(resp))
 	}
 }
 
 func TestMStats_EnoughData(t *testing.T) {
 	usages := []float64{0, 10, 20, 30, 40, 50}
 	w := newTestWorkerWithUsages(usages, 5)
-	resp, err := w.mStats("stats")
+	resp, err := w.stats()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(resp.Values) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(resp.Values))
-	}
-	var stats maxcpu.GetStatsResponse
-	if err := json.Unmarshal(resp.Values[0].Data, &stats); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
-	if stats.Error != "" {
-		t.Errorf("unexpected error: %v", stats.Error)
-	}
-	if len(stats.Metrics) != 5 {
-		t.Errorf("expected 5 metrics, got %d", len(stats.Metrics))
+	if len(resp) != 5 {
+		t.Errorf("expected 5 metrics, got %d", len(resp))
 	}
 	keys := map[string]bool{}
-	for _, m := range stats.Metrics {
+	for _, m := range resp {
 		keys[m.Key] = true
 		if m.Epoch == 0 {
 			t.Errorf("expected non-zero epoch")
@@ -80,7 +63,7 @@ func TestMStats_EnoughData(t *testing.T) {
 func TestMStats_ResetsIdleTime(t *testing.T) {
 	w := newTestWorkerWithUsages([]float64{0, 10, 20}, 2)
 	atomic.StoreInt64(&w.idleTime, 123)
-	_, _ = w.mStats("stats")
+	_, _ = w.stats()
 	if got := atomic.LoadInt64(&w.idleTime); got != 0 {
 		t.Errorf("expected idleTime reset to 0, got %d", got)
 	}
@@ -89,7 +72,7 @@ func TestMStats_ResetsIdleTime(t *testing.T) {
 func TestMStats_ClearsStatsExceptCurrent(t *testing.T) {
 	usages := []float64{0, 10, 20, 30}
 	w := newTestWorkerWithUsages(usages, 2)
-	_, err := w.mStats("stats")
+	_, err := w.stats()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,7 +94,7 @@ func TestMStats_ConcurrentAccess(t *testing.T) {
 	w := newTestWorkerWithUsages(usages, 5)
 	done := make(chan struct{})
 	go func() {
-		_, _ = w.mStats("stats")
+		_, _ = w.stats()
 		close(done)
 	}()
 	// Try to acquire the lock to ensure no deadlock

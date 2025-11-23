@@ -1,0 +1,28 @@
+syntax = "proto3";
+// go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+// go install google.golang.org/grpc/protoc-gen-go-grpc@lastest
+// protoc --go_out=maxcpu --go_opt=paths=source_relative --go-grpc_out=maxcpu --go-grpc_opt=paths=source_relative maxcpu.proto
+import "google/protobuf/empty.proto";
+
+package maxcpu;
+option go_package = "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu";
+
+service MaxCPU {
+  rpc GetStats(google.protobuf.Empty) returns (StatsResponse) {}
+  rpc Hello(google.protobuf.Empty) returns (HelloResponse) {}
+
+}
+
+message HelloResponse {
+  string Message = 1;
+}
+
+message StatsResponse {
+    repeated Metric Metrics = 1;
+}
+
+message Metric {
+    string Key = 1;
+    double Metric = 2;
+    int64 Epoch = 3;
+}

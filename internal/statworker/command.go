@@ -1,7 +1,7 @@
 package statworker
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // The `round` function rounds the input float to the nearest integer and subtracts 1.
@@ -17,37 +18,19 @@ func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
 
-func (w *Worker) MGet(keys []string) (*maxcpu.Response, error) {
-	if len(keys) == 0 || len(keys) > 1 {
-		return nil, fmt.Errorf("no arguments or too many arguments for get")
-	}
-	switch keys[0] {
-	case "hello":
-		return w.mHello(keys[0])
-	case "stats":
-		return w.mStats(keys[0])
-	default:
-		return maxcpu.NotFound, nil
-	}
+func (w *Worker) Hello(_ context.Context, _ *emptypb.Empty) (*maxcpu.HelloResponse, error) {
+	return &maxcpu.HelloResponse{Message: "OK"}, nil
 }
 
-func (w *Worker) mHello(key string) (*maxcpu.Response, error) {
-	res := maxcpu.GetHelloResponse{
-		Message: "OK",
-	}
-	b, err := json.Marshal(res)
+func (w *Worker) GetStats(_ context.Context, _ *emptypb.Empty) (*maxcpu.StatsResponse, error) {
+	stats, err := w.stats()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response: %w", err)
+		return nil, err
 	}
-	mres := &maxcpu.Response{}
-	mres.Values = append(mres.Values, &maxcpu.Value{
-		Key:  key,
-		Data: b,
-	})
-	return mres, nil
+	return &maxcpu.StatsResponse{Metrics: stats}, nil
 }
 
-func (w *Worker) mStats(key string) (*maxcpu.Response, error) {
+func (w *Worker) stats() ([]*maxcpu.Metric, error) {
 	// reset idle time
 	atomic.StoreInt64(&w.idleTime, 0)
 
@@ -70,55 +53,41 @@ func (w *Worker) mStats(key string) (*maxcpu.Response, error) {
 	w.usages = make([]*cpuUsage, historySize)
 	w.usages[0] = current
 
-	var res maxcpu.GetStatsResponse
+	res := make([]*maxcpu.Metric, 0)
 
 	if len(usages) < 2 {
-		res.Error = "Calculating now"
-		b, _ := json.Marshal(res)
-		mres := &maxcpu.Response{}
-		mres.Values = append(mres.Values, &maxcpu.Value{
-			Key:  key,
-			Data: b,
-		})
-		return mres, nil
+		return res, fmt.Errorf("calculating now")
 	}
 
 	sort.Sort(usages)
 	flen := float64(len(usages))
 	epoch := time.Now().Unix()
 
-	res.Metrics = append(res.Metrics, &maxcpu.Metric{
+	res = append(res, &maxcpu.Metric{
 		Key:    "max",
 		Metric: usages[round(flen)],
 		Epoch:  epoch,
 	})
-	res.Metrics = append(res.Metrics, &maxcpu.Metric{
+	res = append(res, &maxcpu.Metric{
 		Key:    "min",
 		Metric: usages[0],
 		Epoch:  epoch,
 	})
-	res.Metrics = append(res.Metrics, &maxcpu.Metric{
+	res = append(res, &maxcpu.Metric{
 		Key:    "avg",
 		Metric: total / flen,
 		Epoch:  epoch,
 	})
-	res.Metrics = append(res.Metrics, &maxcpu.Metric{
+	res = append(res, &maxcpu.Metric{
 		Key:    "90pt",
 		Metric: usages[round(flen*0.90)],
 		Epoch:  epoch,
 	})
-	res.Metrics = append(res.Metrics, &maxcpu.Metric{
+	res = append(res, &maxcpu.Metric{
 		Key:    "75pt",
 		Metric: usages[round(flen*0.75)],
 		Epoch:  epoch,
 	})
 
-	b, _ := json.Marshal(res)
-	mres := &maxcpu.Response{}
-	mres.Values = append(mres.Values, &maxcpu.Value{
-		Key:  key,
-		Data: b,
-	})
-
-	return mres, nil
+	return res, nil
 }
