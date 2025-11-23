@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -16,47 +15,19 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // version by Makefile
 var version string
 
-type cmdOpts struct {
+type Opt struct {
 	Socket   string `short:"s" long:"socket" required:"true" description:"Socket file used calcurating daemon" `
 	AsDaemon bool   `long:"as-daemon" description:"run as daemon"`
 	Version  bool   `short:"v" long:"version" description:"Show version"`
-}
-
-func CHello(c *maxcpu.Client) (*maxcpu.GetHelloResponse, error) {
-	b, err := c.Get("hello")
-	if err != nil {
-		return nil, err
-	}
-	res := &maxcpu.GetHelloResponse{}
-	err = json.Unmarshal(b, res)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
-func CStats(c *maxcpu.Client) (*maxcpu.GetStatsResponse, error) {
-	b, err := c.Get("stats")
-	if err != nil {
-		return nil, err
-	}
-	res := &maxcpu.GetStatsResponse{}
-	err = json.Unmarshal(b, res)
-	if err != nil {
-		return nil, err
-	}
-	if res.Error != "" {
-		return nil, fmt.Errorf(res.Error)
-	}
-	if len(res.Metrics) == 0 {
-		return nil, fmt.Errorf("could not fetch any metrics")
-	}
-	return res, nil
+	client   maxcpu.MaxCPUClient
 }
 
 func runBinaryCheck(socket string, current time.Time) {
@@ -89,7 +60,7 @@ func selfModified() (time.Time, error) {
 	return fs.ModTime(), nil
 }
 
-func execBackground(opts cmdOpts) int {
+func execBackground(opt *Opt) int {
 	// check proc before exec
 	_, err := statworker.GetStat()
 	if err != nil {
@@ -97,7 +68,7 @@ func execBackground(opts cmdOpts) int {
 		return 1
 	}
 
-	cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opts.Socket)
+	cmd := exec.Command(os.Args[0], "--as-daemon", "--socket", opt.Socket)
 	err = cmd.Start()
 	if err != nil {
 		log.Printf("%v", err)
@@ -117,7 +88,7 @@ func runIdleCheck(w *statworker.Worker) {
 	}
 }
 
-func runBackground(opts cmdOpts) int {
+func runBackground(opt *Opt) int {
 
 	modified, err := selfModified()
 	if err != nil {
@@ -129,34 +100,31 @@ func runBackground(opts cmdOpts) int {
 
 	go func() { worker.Run() }()
 	go func() { runIdleCheck(worker) }()
-	go func() { runBinaryCheck(opts.Socket, modified) }()
+	go func() { runBinaryCheck(opt.Socket, modified) }()
 
 	time.Sleep(1 * time.Second)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	server := grpc.NewServer()
+	maxcpu.RegisterMaxCPUServer(server, worker)
 
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
 		<-sigChan
-		cancel()
+		server.GracefulStop()
 		close(idleConnsClosed)
 	}()
 
-	os.Remove(opts.Socket)
+	os.Remove(opt.Socket)
 
-	unixListener, err := net.Listen("unix", opts.Socket)
+	unixListener, err := net.Listen("unix", opt.Socket)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
 
-	mserver, _ := maxcpu.NewServer()
-	mserver.Register("GET", worker.MGet)
-
-	if err := mserver.Start(ctx, unixListener); err != nil {
+	if err := server.Serve(unixListener); err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
@@ -164,24 +132,10 @@ func runBackground(opts cmdOpts) int {
 	return 0
 }
 
-func makeClient(opts cmdOpts) (*maxcpu.Client, error) {
-	dialer := func() (net.Conn, error) {
-		return net.DialTimeout("unix", opts.Socket, 5*time.Second)
-	}
-	c, err := maxcpu.NewClient(dialer)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
-func checkDaemonAlive(opts cmdOpts) bool {
-	client, err := makeClient(opts)
-	if err != nil {
-		log.Printf("%v", err)
-		return false
-	}
-	_, err = CHello(client)
+func checkDaemonAlive(opt *Opt) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	_, err := opt.client.Hello(ctx, &emptypb.Empty{})
 	if err != nil {
 		log.Printf("%v", err)
 		return false
@@ -189,14 +143,10 @@ func checkDaemonAlive(opts cmdOpts) bool {
 	return true
 }
 
-func getStats(opts cmdOpts) int {
-	client, err := makeClient(opts)
-	if err != nil {
-		log.Printf("%v", err)
-		return 1
-	}
-
-	res, err := CStats(client)
+func getStats(opt *Opt) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	res, err := opt.client.GetStats(ctx, &emptypb.Empty{})
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
@@ -209,7 +159,23 @@ func getStats(opts cmdOpts) int {
 			m.Epoch,
 		)
 	}
-	return 1
+	return 0
+}
+
+func makeClient(socket string) (maxcpu.MaxCPUClient, error) {
+	dialer := func(_ context.Context, _ string) (net.Conn, error) {
+		return net.DialTimeout("unix", socket, 1*time.Second)
+	}
+	conn, err := grpc.NewClient(
+		socket,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+	)
+	if err != nil {
+		return nil, err
+	}
+	c := maxcpu.NewMaxCPUClient(conn)
+	return c, nil
 }
 
 func main() {
@@ -217,10 +183,10 @@ func main() {
 }
 
 func _main() int {
-	opts := cmdOpts{}
-	psr := flags.NewParser(&opts, flags.HelpFlag|flags.PassDoubleDash)
+	opt := &Opt{}
+	psr := flags.NewParser(opt, flags.HelpFlag|flags.PassDoubleDash)
 	_, err := psr.Parse()
-	if opts.Version {
+	if opt.Version {
 		fmt.Printf(`%s %s
 Compiler: %s %s
 `,
@@ -235,15 +201,22 @@ Compiler: %s %s
 		return 1
 	}
 
-	if opts.AsDaemon {
-		return runBackground(opts)
+	if opt.AsDaemon {
+		return runBackground(opt)
 	}
 
-	if !checkDaemonAlive(opts) {
+	client, err := makeClient(opt.Socket)
+	if err != nil {
+		log.Printf("%v", err)
+		return 1
+	}
+	opt.client = client
+
+	if !checkDaemonAlive(opt) {
 		// exec daemon
 		log.Printf("start background process")
-		return execBackground(opts)
+		return execBackground(opt)
 	}
 
-	return getStats(opts)
+	return getStats(opt)
 }
