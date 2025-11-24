@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.13](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.12...v0.0.13) - 2025-11-24
+- use connect-go by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/18
+- remove wrapper by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/20
+
 ## [v0.0.12](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.11...v0.0.12) - 2025-11-23
 - pin actions commithash by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/15
 - use grpc by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/17
