@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.12](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.11...v0.0.12) - 2025-11-23
+- pin actions commithash by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/15
+- use grpc by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/17
+
 ## [v0.0.11](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.10...v0.0.11) - 2025-06-19
 - introduced tagpr by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/10
 - fix branch by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/11
