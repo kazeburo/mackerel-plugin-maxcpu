@@ -18,8 +18,7 @@ import (
 func startTestConnectServer(socket string) (*http.Server, func()) {
 	_ = os.Remove(socket)
 	worker := statworker.New()
-	connectHandler := &workerConnectHandler{worker: worker}
-	path, handler := maxcpuconnect.NewMaxCPUHandler(connectHandler)
+	path, handler := maxcpuconnect.NewMaxCPUHandler(worker)
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
 	lis, err := net.Listen("unix", socket)

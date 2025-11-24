@@ -16,7 +16,6 @@ import (
 	connect "github.com/bufbuild/connect-go"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
-	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 	maxcpuconnect "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -29,27 +28,6 @@ type Opt struct {
 	AsDaemon bool   `long:"as-daemon" description:"run as daemon"`
 	Version  bool   `short:"v" long:"version" description:"Show version"`
 	client   maxcpuconnect.MaxCPUClient
-}
-
-// Adapter for connect-go's MaxCPUHandler
-type workerConnectHandler struct {
-	worker *statworker.Worker
-}
-
-func (h *workerConnectHandler) GetStats(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.StatsResponse], error) {
-	resp, err := h.worker.GetStats(ctx, req.Msg)
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(resp), nil
-}
-
-func (h *workerConnectHandler) Hello(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.HelloResponse], error) {
-	resp, err := h.worker.Hello(ctx, req.Msg)
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(resp), nil
 }
 
 func runBinaryCheck(socket string, current time.Time) {
@@ -127,8 +105,7 @@ func runBackground(opt *Opt) int {
 	time.Sleep(1 * time.Second)
 
 	mux := http.NewServeMux()
-	connectHandler := &workerConnectHandler{worker: worker}
-	path, handler := maxcpuconnect.NewMaxCPUHandler(connectHandler)
+	path, handler := maxcpuconnect.NewMaxCPUHandler(worker)
 	mux.Handle(path, handler)
 
 	idleConnsClosed := make(chan struct{})
