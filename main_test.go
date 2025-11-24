@@ -40,7 +40,7 @@ func TestMakeClient(t *testing.T) {
 	socket := path.Join(t.TempDir(), "test_maxcpu.sock")
 	_, cleanup := startTestConnectServer(socket)
 	defer cleanup()
-	time.Sleep(100 * time.Millisecond) // サーバ起動待ち
+	time.Sleep(100 * time.Millisecond) // Wait for server startup
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
