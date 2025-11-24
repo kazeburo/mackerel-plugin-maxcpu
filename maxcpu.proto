@@ -1,7 +1,10 @@
 syntax = "proto3";
 // go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 // go install google.golang.org/grpc/protoc-gen-go-grpc@lastest
-// protoc --go_out=maxcpu --go_opt=paths=source_relative --go-grpc_out=maxcpu --go-grpc_opt=paths=source_relative maxcpu.proto
+// go install github.com/bufbuild/connect-go/cmd/protoc-gen-connect-go@latest
+// protoc --go_out=maxcpu --go_opt=paths=source_relative maxcpu.proto
+// protoc --connect-go_out=maxcpu --connect-go_opt=paths=source_relative maxcpu.proto
+
 import "google/protobuf/empty.proto";
 
 package maxcpu;
