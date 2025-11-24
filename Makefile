@@ -5,10 +5,10 @@ all: mackerel-plugin-maxcpu
 
 .PHONY: mackerel-plugin-maxcpu
 
-mackerel-plugin-maxcpu: main.go maxcpu/*.go
+mackerel-plugin-maxcpu: main.go maxcpu/**.go internal/statworker/*.go
 	go build $(LDFLAGS) -o mackerel-plugin-maxcpu main.go
 
-linux: main.go maxcpu/*.go
+linux: main.go maxcpu/**.go internal/statworker/*.go
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o mackerel-plugin-maxcpu main.go
 
 linux-check: mackerel-plugin-maxcpu
@@ -30,7 +30,5 @@ linux-check: mackerel-plugin-maxcpu
 
 check:
 	go test ./...
-
-fmt:
-	go fmt ./...
+	go vet ./...
 

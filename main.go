@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	connect "github.com/bufbuild/connect-go"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	maxcpuconnect "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -27,7 +28,28 @@ type Opt struct {
 	Socket   string `short:"s" long:"socket" required:"true" description:"Socket file used calcurating daemon" `
 	AsDaemon bool   `long:"as-daemon" description:"run as daemon"`
 	Version  bool   `short:"v" long:"version" description:"Show version"`
-	client   maxcpu.MaxCPUClient
+	client   maxcpuconnect.MaxCPUClient
+}
+
+// Adapter for connect-go's MaxCPUHandler
+type workerConnectHandler struct {
+	worker *statworker.Worker
+}
+
+func (h *workerConnectHandler) GetStats(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.StatsResponse], error) {
+	resp, err := h.worker.GetStats(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (h *workerConnectHandler) Hello(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.HelloResponse], error) {
+	resp, err := h.worker.Hello(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(resp), nil
 }
 
 func runBinaryCheck(socket string, current time.Time) {
@@ -104,38 +126,43 @@ func runBackground(opt *Opt) int {
 
 	time.Sleep(1 * time.Second)
 
-	server := grpc.NewServer()
-	maxcpu.RegisterMaxCPUServer(server, worker)
+	mux := http.NewServeMux()
+	connectHandler := &workerConnectHandler{worker: worker}
+	path, handler := maxcpuconnect.NewMaxCPUHandler(connectHandler)
+	mux.Handle(path, handler)
 
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
 		<-sigChan
-		server.GracefulStop()
 		close(idleConnsClosed)
 	}()
 
 	os.Remove(opt.Socket)
-
 	unixListener, err := net.Listen("unix", opt.Socket)
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
-
-	if err := server.Serve(unixListener); err != nil {
-		log.Printf("%v", err)
-		return 1
-	}
+	srv := &http.Server{Handler: mux}
+	go func() {
+		if err := srv.Serve(unixListener); err != nil && err != http.ErrServerClosed {
+			log.Printf("%v", err)
+		}
+	}()
 	<-idleConnsClosed
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
 	return 0
 }
 
 func checkDaemonAlive(opt *Opt) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	_, err := opt.client.Hello(ctx, &emptypb.Empty{})
+	req := connect.NewRequest(&emptypb.Empty{})
+	_, err := opt.client.Hello(ctx, req)
 	if err != nil {
 		log.Printf("check daemon alive failed: %v", err)
 		return false
@@ -146,12 +173,12 @@ func checkDaemonAlive(opt *Opt) bool {
 func getStats(opt *Opt) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	res, err := opt.client.GetStats(ctx, &emptypb.Empty{})
+	res, err := opt.client.GetStats(ctx, connect.NewRequest(&emptypb.Empty{}))
 	if err != nil {
 		log.Printf("%v", err)
 		return 1
 	}
-	for _, m := range res.Metrics {
+	for _, m := range res.Msg.Metrics {
 		fmt.Printf(
 			"maxcpu.us_sy_wa_si_st_usage.%s\t%f\t%d\n",
 			m.Key,
@@ -162,20 +189,16 @@ func getStats(opt *Opt) int {
 	return 0
 }
 
-func makeClient(socket string) (maxcpu.MaxCPUClient, error) {
-	dialer := func(_ context.Context, _ string) (net.Conn, error) {
-		return net.DialTimeout("unix", socket, 1*time.Second)
+func makeClient(socket string) (maxcpuconnect.MaxCPUClient, error) {
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.DialTimeout("unix", socket, 1*time.Second)
+			},
+		},
 	}
-	conn, err := grpc.NewClient(
-		"unix:"+socket,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(dialer),
-		grpc.WithDisableHealthCheck(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	c := maxcpu.NewMaxCPUClient(conn)
+	baseURL := "http://unix"
+	c := maxcpuconnect.NewMaxCPUClient(httpClient, baseURL)
 	return c, nil
 }
 
