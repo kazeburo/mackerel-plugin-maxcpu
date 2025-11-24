@@ -31,7 +31,7 @@ type Opt struct {
 	client   maxcpuconnect.MaxCPUClient
 }
 
-// connect-go用のMaxCPUHandlerアダプタ
+// Adapter for connect-go's MaxCPUHandler
 type workerConnectHandler struct {
 	worker *statworker.Worker
 }
