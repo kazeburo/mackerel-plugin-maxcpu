@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bufbuild/connect-go"
 	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -18,16 +19,16 @@ func round(f float64) int64 {
 	return int64(math.Round(f)) - 1
 }
 
-func (w *Worker) Hello(_ context.Context, _ *emptypb.Empty) (*maxcpu.HelloResponse, error) {
-	return &maxcpu.HelloResponse{Message: "OK"}, nil
+func (*Worker) Hello(_ context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.HelloResponse], error) {
+	return connect.NewResponse(&maxcpu.HelloResponse{Message: "OK"}), nil
 }
 
-func (w *Worker) GetStats(_ context.Context, _ *emptypb.Empty) (*maxcpu.StatsResponse, error) {
+func (w *Worker) GetStats(_ context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[maxcpu.StatsResponse], error) {
 	stats, err := w.stats()
 	if err != nil {
 		return nil, err
 	}
-	return &maxcpu.StatsResponse{Metrics: stats}, nil
+	return connect.NewResponse(&maxcpu.StatsResponse{Metrics: stats}), nil
 }
 
 func (w *Worker) stats() ([]*maxcpu.Metric, error) {
