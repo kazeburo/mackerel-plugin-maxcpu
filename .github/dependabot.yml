@@ -5,15 +5,17 @@ updates:
     directory: /
     schedule:
       interval: daily
-      time: "00:00"
     commit-message:
       prefix: "ci:"
+    groups:
+      dependencies:
+        patterns:
+          - '*'
 
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: daily
-      time: "00:00"
     commit-message:
       prefix: "go:"
     groups:
