@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.0.14](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.13...v0.0.14) - 2026-02-13
+- Create dependabot.yml by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/21
+- go: bump google.golang.org/protobuf from 1.36.10 to 1.36.11 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/23
+- ci: bump the dependencies group with 4 updates by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/24
+
 ## [v0.0.13](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.12...v0.0.13) - 2025-11-24
 - use connect-go by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/18
 - remove wrapper by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/20
