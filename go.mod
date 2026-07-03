@@ -1,6 +1,6 @@
 module github.com/kazeburo/mackerel-plugin-maxcpu
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/bufbuild/connect-go v1.10.0
@@ -8,4 +8,4 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
-require golang.org/x/sys v0.38.0 // indirect
+require golang.org/x/sys v0.46.0 // indirect
