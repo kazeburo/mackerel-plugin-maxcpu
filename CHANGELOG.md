@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.0.15](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.14...v0.0.15) - 2026-07-10
+
+- ci: bump Songmu/tagpr from 1.15.0 to 1.17.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/25
+- ci: bump goreleaser/goreleaser-action from 6.4.0 to 7.0.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/27
+- ci: bump the dependencies group with 2 updates by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/28
+- ci: bump the dependencies group with 2 updates by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/29
+- ci: bump Songmu/tagpr from 1.18.1 to 1.18.2 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/30
+- ci: bump the dependencies group with 2 updates by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/31
+- ci: bump the dependencies group across 1 directory with 4 updates by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/34
+- Update Dependabot schedule and settings by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/35
+- go: bump golang.org/x/sys from 0.38.0 to 0.46.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/36
+- go: bump golang.org/x/sys from 0.46.0 to 0.47.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/37
+- ci: bump goreleaser/goreleaser-action from 7.2.2 to 7.2.3 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/38
+
 ## [v0.0.14](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.13...v0.0.14) - 2026-02-13
 - Create dependabot.yml by @kazeburo in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/21
 - go: bump google.golang.org/protobuf from 1.36.10 to 1.36.11 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/23
