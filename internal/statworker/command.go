@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
+	"github.com/monitoring-forge/mackerel-plugin-maxcpu/maxcpu"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

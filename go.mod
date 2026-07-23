@@ -1,4 +1,4 @@
-module github.com/kazeburo/mackerel-plugin-maxcpu
+module github.com/monitoring-forge/mackerel-plugin-maxcpu
 
 go 1.25.0
 

@@ -1,5 +1,6 @@
 VERSION=0.0.15
-LDFLAGS=-ldflags "-w -s -X main.version=${VERSION} -X github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu.version=${VERSION}"
+GITCOMMIT?=$(shell git describe --dirty --always)
+LDFLAGS=-ldflags "-w -s -X main.version=${VERSION} -X main.commit=${GITCOMMIT}"
 
 all: mackerel-plugin-maxcpu
 
@@ -29,6 +30,7 @@ linux-check: mackerel-plugin-maxcpu
 	pkill -f $$tmpfile'
 
 check:
-	go test ./...
+	go test -v ./...
+	go test -race ./...
 	go vet ./...
 

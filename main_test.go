@@ -10,8 +10,8 @@ import (
 	"time"
 
 	connect "github.com/bufbuild/connect-go"
-	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
-	maxcpuconnect "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
+	"github.com/monitoring-forge/mackerel-plugin-maxcpu/internal/statworker"
+	maxcpuconnect "github.com/monitoring-forge/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
