@@ -9,19 +9,22 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
 	connect "github.com/bufbuild/connect-go"
 	"github.com/jessevdk/go-flags"
-	"github.com/kazeburo/mackerel-plugin-maxcpu/internal/statworker"
-	maxcpuconnect "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
+	"github.com/monitoring-forge/mackerel-plugin-maxcpu/internal/statworker"
+	maxcpuconnect "github.com/monitoring-forge/mackerel-plugin-maxcpu/maxcpu/maxcpuconnect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// version by Makefile
 var version string
+var commit string
 
 type Opt struct {
 	Socket   string `short:"s" long:"socket" required:"true" description:"Socket file used calcurating daemon" `
@@ -167,9 +170,25 @@ func getStats(opt *Opt) int {
 }
 
 func makeClient(socket string) (maxcpuconnect.MaxCPUClient, error) {
+	user, err := user.Current()
+	if err != nil {
+		return nil, err
+	}
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				// check owner of socket file
+				fi, err := os.Stat(socket)
+				if err != nil {
+					return nil, err
+				}
+				stat, ok := fi.Sys().(*syscall.Stat_t)
+				if !ok {
+					return nil, fmt.Errorf("failed to get socket file stat")
+				}
+				if strconv.Itoa(int(stat.Uid)) != user.Uid {
+					return nil, fmt.Errorf("socket file owner is not current user")
+				}
 				return net.DialTimeout("unix", socket, 1*time.Second)
 			},
 		},
@@ -188,13 +207,17 @@ func _main() int {
 	psr := flags.NewParser(opt, flags.HelpFlag|flags.PassDoubleDash)
 	_, err := psr.Parse()
 	if opt.Version {
-		fmt.Printf(`%s %s
-Compiler: %s %s
-`,
-			os.Args[0],
+		if commit == "" {
+			commit = "dev"
+		}
+		fmt.Printf(
+			"%s-%s\n%s/%s, %s, %s\n",
+			filepath.Base(os.Args[0]),
 			version,
-			runtime.Compiler,
-			runtime.Version())
+			runtime.GOOS,
+			runtime.GOARCH,
+			runtime.Version(),
+			commit)
 		return 0
 	}
 	if err != nil {

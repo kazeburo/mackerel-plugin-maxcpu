@@ -7,12 +7,11 @@ package maxcpuconnect
 import (
 	context "context"
 	errors "errors"
+	connect_go "github.com/bufbuild/connect-go"
+	maxcpu "github.com/monitoring-forge/mackerel-plugin-maxcpu/maxcpu"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
-
-	connect_go "github.com/bufbuild/connect-go"
-	maxcpu "github.com/kazeburo/mackerel-plugin-maxcpu/maxcpu"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file and the connect package are

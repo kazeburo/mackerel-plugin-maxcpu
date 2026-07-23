@@ -26,11 +26,11 @@ At the first time of execution, mackerel-plugin-maxcpu spawns the calculating da
 Sample
 
 ```
-$ ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
-2020/10/30 10:40:54 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial unix /tmp/maxcpu.sock: connect: no such file or directory"
+$ ./mackerel-plugin-maxcpu --socket /var/run/mackerel-agent/maxcpu.sock
+2020/10/30 10:40:54 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial unix /var/run/mackerel-agent/maxcpu.sock: connect: no such file or directory"
 2020/10/30 10:40:54 start background process
 
-$ ./mackerel-plugin-maxcpu --socket /tmp/maxcpu.sock
+$ ./mackerel-plugin-maxcpu --socket /var/run/mackerel-agent/maxcpu.sock
 maxcpu.us_sy_wa_si_st_usage.max 0.251256        1604022058
 maxcpu.us_sy_wa_si_st_usage.min 0.250627        1604022058
 maxcpu.us_sy_wa_si_st_usage.avg 0.250941        1604022058
@@ -40,5 +40,5 @@ maxcpu.us_sy_wa_si_st_usage.75pt        0.251256        1604022058
 
 ## Install
 
-Please download release page or `mkr plugin install kazeburo/mackerel-plugin-maxcpu`.
+Please download release page or `mkr plugin install monitoring-forge/mackerel-plugin-maxcpu`.
 
