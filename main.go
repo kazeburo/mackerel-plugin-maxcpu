@@ -9,10 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"os/user"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -174,10 +172,7 @@ func getStats(opt *Opt) int {
 }
 
 func makeClient(socket string) (maxcpuconnect.MaxCPUClient, error) {
-	user, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
+	uid := os.Geteuid()
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -190,10 +185,13 @@ func makeClient(socket string) (maxcpuconnect.MaxCPUClient, error) {
 				if !ok {
 					return nil, fmt.Errorf("failed to get socket file stat")
 				}
-				if strconv.Itoa(int(stat.Uid)) != user.Uid {
+				if int(stat.Uid) != uid {
 					return nil, fmt.Errorf("socket file owner is not current user")
 				}
-				return net.DialTimeout("unix", socket, 1*time.Second)
+				ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+				defer cancel()
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", socket)
 			},
 		},
 	}
