@@ -125,6 +125,10 @@ func runBackground(opt *Opt) int {
 		log.Printf("%v", err)
 		return 1
 	}
+	if err := os.Chmod(opt.Socket, 0600); err != nil {
+		log.Printf("%v", err)
+		return 1
+	}
 	srv := &http.Server{Handler: mux}
 	go func() {
 		if err := srv.Serve(unixListener); err != nil && err != http.ErrServerClosed {
