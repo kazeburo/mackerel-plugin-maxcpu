@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.16](https://github.com/monitoring-forge/mackerel-plugin-maxcpu/compare/v0.0.15...v0.0.16) - 2026-07-23
+
+- Feat/repo transfer and improve socket check by @kazeburo in https://github.com/monitoring-forge/mackerel-plugin-maxcpu/pull/39
+
 ## [v0.0.15](https://github.com/kazeburo/mackerel-plugin-maxcpu/compare/v0.0.14...v0.0.15) - 2026-07-10
 
 - ci: bump Songmu/tagpr from 1.15.0 to 1.17.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/mackerel-plugin-maxcpu/pull/25
