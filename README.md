@@ -27,7 +27,7 @@ Sample
 
 ```
 $ sudo ./mackerel-plugin-maxcpu --socket /var/run/maxcpu.sock
-2020/10/30 10:40:54 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial unix /var/run/maxcpu.sock: connect: no such file or directory"
+2020/10/30 10:40:54 check daemon alive failed: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial unix /var/run/maxcpu.sock: connect: no such file or directory"
 2020/10/30 10:40:54 start background process
 
 $ sudo ./mackerel-plugin-maxcpu --socket /var/run/maxcpu.sock
